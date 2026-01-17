@@ -20,8 +20,10 @@ export default class HelloWorldPlugin extends Plugin {
 						new Notice(`Removed ${count} sync conflict file(s)`);
 					}
 				} catch (err) {
+					const errorMessage =
+						err instanceof Error ? err.message : String(err);
 					new Notice(
-						`Error removing sync conflict files: ${err.message}`,
+						`Error removing sync conflict files: ${errorMessage}`,
 					);
 					console.error(err);
 				}
