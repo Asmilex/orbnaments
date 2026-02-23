@@ -1,177 +1,316 @@
-import { Notice, Plugin } from "obsidian";
+import { Notice, Plugin, TFile } from "obsidian";
 import { Result } from "typescript-result";
 
 // Error classes for different failure scenarios
 class SyncConflictError extends Error {
-  readonly type = "sync-conflict-error";
-  cause?: unknown;
+	readonly type = "sync-conflict-error";
+	cause?: unknown;
 
-  constructor(message: string, cause?: unknown) {
-    super(message);
-    this.name = "SyncConflictError";
-    this.cause = cause;
-  }
+	constructor(message: string, cause?: unknown) {
+		super(message);
+		this.name = "SyncConflictError";
+		this.cause = cause;
+	}
 }
 
-export default class HelloWorldPlugin extends Plugin {
-  async onload() {
-    console.debug("Orbnaments loading...");
+class MoveAttachmentsError extends Error {
+	readonly type = "move-attachments-error";
+	cause?: unknown;
 
-    this.addCommand({
-      id: "remove-syncthing-conflict",
-      // Syncthing is a proper name.
-      // eslint-disable-next-line obsidianmd/ui/sentence-case
-      name: "Clear Syncthing's conflicts",
-      callback: async () => {
-        const result = await this.removeSyncConflicts();
+	constructor(message: string, cause?: unknown) {
+		super(message);
+		this.name = "MoveAttachmentsError";
+		this.cause = cause;
+	}
+}
 
-        const [count, error] = result.toTuple();
+export default class OrbnamentsPlugin extends Plugin {
+	async onload() {
+		console.debug("Orbnaments loading...");
 
-        if (error) {
-          new Notice(`Error removing sync conflict files: ${error.message}`);
-          console.error(error);
-          return;
-        }
+		this.addCommand({
+			id: "remove-syncthing-conflict",
+			// Syncthing is a proper name.
+			// eslint-disable-next-line obsidianmd/ui/sentence-case
+			name: "Clear Syncthing's conflicts",
+			callback: async () => {
+				const result = await this.removeSyncConflicts();
 
-        if (count === 0) {
-          new Notice("No sync conflict files found");
-        } else {
-          new Notice(`Removed ${count} sync conflict file(s)`);
-        }
-      },
-    });
+				const [count, error] = result.toTuple();
 
-    this.addCommand({
-      id: "move-expenses-files",
-      name: "Tidy up expenses from the vault root.",
-      callback: async () => {
-        const result = await this.moveExpensesFiles();
+				if (error) {
+					new Notice(
+						`Error removing sync conflict files: ${error.message}`,
+					);
+					console.error(error);
+					return;
+				}
 
-        const [count, error] = result.toTuple();
+				if (count === 0) {
+					new Notice("No sync conflict files found");
+				} else {
+					new Notice(`Removed ${count} sync conflict file(s)`);
+				}
+			},
+		});
 
-        if (error) {
-          new Notice(`Error moving files: ${error.message}`);
-          console.error(error);
-          return;
-        }
+		this.addCommand({
+			id: "move-expenses-files",
+			name: "Tidy up expenses from the vault root",
+			callback: async () => {
+				const result = await this.moveExpensesFiles();
 
-        if (count === 0) {
-          new Notice("No files found linking to [[expenses]] in root");
-        } else {
-          new Notice(`Moved ${count} file(s) to Finanzas folder`);
-        }
-      },
-    });
-  }
+				const [count, error] = result.toTuple();
 
-  onunload() {
-    console.debug("Orbnaments unloading");
-  }
+				if (error) {
+					new Notice(`Error moving files: ${error.message}`);
+					console.error(error);
+					return;
+				}
 
-  /**
-   * gather all *.sync-conflict* files in the vault and deletes/trashes them
-   * @returns a Result containing the number of files removed or an error
-   */
-  async removeSyncConflicts(): Promise<Result<number, SyncConflictError>> {
-    return Result.try(async () => {
-      const files = this.app.vault.getFiles();
-      const syncConflictFiles = files.filter((file) =>
-        file.name.includes(".sync-conflict"),
-      );
+				if (count === 0) {
+					new Notice(
+						"No files found linking to [[expenses]] in root",
+					);
+				} else {
+					new Notice(`Moved ${count} file(s) to Finanzas folder`);
+				}
+			},
+		});
 
-      if (syncConflictFiles.length === 0) {
-        return 0;
-      }
+		this.addCommand({
+			id: "move-orphaned-attachments",
+			name: "Move orphaned attachments closer to their files",
+			callback: async () => {
+				const result = await this.moveOrphanedAttachments();
 
-      const promises = syncConflictFiles.map((file) => {
-        return this.app.fileManager.trashFile(file);
-      });
+				const [count, error] = result.toTuple();
 
-      await Promise.all(promises);
-      return syncConflictFiles.length;
-    }).mapError((error) => {
-      return new SyncConflictError(
-        `Failed to remove sync conflict files: ${error.message}`,
-        error,
-      );
-    });
-  }
+				if (error) {
+					new Notice(`Error moving attachments: ${error.message}`);
+					console.error(error);
+					return;
+				}
 
-  /**
-   * Move files that link to [[expenses]] from the root of the vault to the "Finanzas" folder
-   * @returns a Result containing the number of files moved or an error
-   */
-  async moveExpensesFiles(): Promise<Result<number, MoveFilesError>> {
-    return Result.try(async () => {
-      const vault = this.app.vault;
-      const metadataCache = this.app.metadataCache;
-      const fileManager = this.app.fileManager;
+				if (count === 0) {
+					new Notice("No orphaned attachments found");
+				} else {
+					new Notice(`Moved ${count} attachment(s)`);
+				}
+			},
+		});
+	}
 
-      // Find the expenses file
-      const expensesFile = metadataCache.getFirstLinkpathDest("expenses", "");
+	onunload() {
+		console.debug("Orbnaments unloading");
+	}
 
-      if (!expensesFile) {
-        return 0;
-      }
+	/**
+	 * gather all *.sync-conflict* files in the vault and deletes/trashes them
+	 * @returns a Result containing the number of files removed or an error
+	 */
+	async removeSyncConflicts(): Promise<Result<number, SyncConflictError>> {
+		return Result.try(async () => {
+			const files = this.app.vault.getFiles();
+			const syncConflictFiles = files.filter((file) =>
+				file.name.includes(".sync-conflict"),
+			);
 
-      // Get all files that link to expenses using resolvedLinks
-      const resolvedLinks = metadataCache.resolvedLinks;
-      const filesToMove = [];
+			if (syncConflictFiles.length === 0) {
+				return 0;
+			}
 
-      for (const [sourcePath, links] of Object.entries(resolvedLinks)) {
-        // Check if this file links to expenses
-        if (links[expensesFile.path]) {
-          const file = vault.getFileByPath(sourcePath);
+			const promises = syncConflictFiles.map((file) => {
+				return this.app.fileManager.trashFile(file);
+			});
 
-          // Only move files in the vault root
-          if (file && (file.parent?.path === "" || file.parent?.path === "/")) {
-            filesToMove.push(file);
-          }
-        }
-      }
+			await Promise.all(promises);
+			return syncConflictFiles.length;
+		}).mapError((error) => {
+			return new SyncConflictError(
+				`Failed to remove sync conflict files: ${error.message}`,
+				error,
+			);
+		});
+	}
 
-      if (filesToMove.length === 0) {
-        return 0;
-      }
+	/**
+	 * Move files that link to [[expenses]] from the root of the vault to the "Finanzas" folder
+	 * @returns a Result containing the number of files moved or an error
+	 */
+	async moveExpensesFiles(): Promise<Result<number, MoveFilesError>> {
+		return Result.try(async () => {
+			const vault = this.app.vault;
+			const metadataCache = this.app.metadataCache;
+			const fileManager = this.app.fileManager;
 
-      // Ensure the Finanzas folder exists
-      const finanzasPath = "Finanzas";
-      let finanzasFolder = vault.getFolderByPath(finanzasPath);
+			// Find the expenses file
+			const expensesFile = metadataCache.getFirstLinkpathDest(
+				"expenses",
+				"",
+			);
 
-      if (!finanzasFolder) {
-        await vault.createFolder(finanzasPath);
-        finanzasFolder = vault.getFolderByPath(finanzasPath);
-      }
+			if (!expensesFile) {
+				return 0;
+			}
 
-      if (!finanzasFolder) {
-        throw new MoveFilesError("Failed to create or access Finanzas folder");
-      }
+			// Get all files that link to expenses using resolvedLinks
+			const resolvedLinks = metadataCache.resolvedLinks;
+			const filesToMove = [];
 
-      // Move each file
-      const movePromises = filesToMove.map((file) => {
-        const newPath = `${finanzasPath}/${file.name}`;
-        return fileManager.renameFile(file, newPath);
-      });
+			for (const [sourcePath, links] of Object.entries(resolvedLinks)) {
+				// Check if this file links to expenses
+				if (links[expensesFile.path]) {
+					const file = vault.getFileByPath(sourcePath);
 
-      await Promise.all(movePromises);
-      return filesToMove.length;
-    }).mapError((error) => {
-      return new MoveFilesError(
-        `Failed to move files: ${error.message}`,
-        error,
-      );
-    });
-  }
+					// Only move files in the vault root
+					if (
+						file &&
+						(file.parent?.path === "" || file.parent?.path === "/")
+					) {
+						filesToMove.push(file);
+					}
+				}
+			}
+
+			if (filesToMove.length === 0) {
+				return 0;
+			}
+
+			// Ensure the Finanzas folder exists
+			const finanzasPath = "Finanzas";
+			let finanzasFolder = vault.getFolderByPath(finanzasPath);
+
+			if (!finanzasFolder) {
+				await vault.createFolder(finanzasPath);
+				finanzasFolder = vault.getFolderByPath(finanzasPath);
+			}
+
+			if (!finanzasFolder) {
+				throw new MoveFilesError(
+					"Failed to create or access Finanzas folder",
+				);
+			}
+
+			// Move each file
+			const movePromises = filesToMove.map((file) => {
+				const newPath = `${finanzasPath}/${file.name}`;
+				return fileManager.renameFile(file, newPath);
+			});
+
+			await Promise.all(movePromises);
+			return filesToMove.length;
+		}).mapError((error) => {
+			return new MoveFilesError(
+				`Failed to move files: ${error.message}`,
+				error,
+			);
+		});
+	}
+
+	/**
+	 * Move attachments from the root attachments folder to be closer to their associated files.
+	 * Only moves attachments that are linked from a single file.
+	 * @param attachmentsFolder - The root folder containing attachments (default: "img")
+	 * @returns a Result containing the number of attachments moved or an error
+	 */
+	async moveOrphanedAttachments(
+		attachmentsFolder: string = "img",
+	): Promise<Result<number, MoveAttachmentsError>> {
+		return Result.try(async () => {
+			const vault = this.app.vault;
+			const metadataCache = this.app.metadataCache;
+			const fileManager = this.app.fileManager;
+
+			// Get the attachments folder
+			const rootFolder = vault.getFolderByPath(attachmentsFolder);
+			if (!rootFolder) {
+				return 0;
+			}
+
+			// Get only files in the specified attachments folder
+			const attachmentsInRoot = rootFolder.children.filter(
+				(child): child is TFile => child instanceof TFile,
+			);
+
+			if (attachmentsInRoot.length === 0) {
+				return 0;
+			}
+
+			// Move attachments that are only linked from one file
+			let movedCount = 0;
+
+			for (const attachment of attachmentsInRoot) {
+				// Find all files that link to this attachment by checking backlinks
+				const linkers: string[] = [];
+				const resolvedLinks = metadataCache.resolvedLinks;
+
+				for (const [sourcePath, links] of Object.entries(
+					resolvedLinks,
+				)) {
+					if (links[attachment.path]) {
+						linkers.push(sourcePath);
+					}
+				}
+
+				// Only move if linked from exactly one file
+				if (linkers.length !== 1) {
+					continue;
+				}
+
+				const linkerPath = linkers[0];
+				if (!linkerPath) {
+					continue;
+				}
+
+				const linkerFile = vault.getFileByPath(linkerPath);
+				if (!linkerFile) {
+					continue;
+				}
+
+				// Determine the target folder (same folder as the linking file + /attachmentsFolder)
+				const linkerParentPath = linkerFile.parent?.path ?? "";
+				const targetFolderPath: string =
+					linkerParentPath === "" || linkerParentPath === "/"
+						? attachmentsFolder
+						: `${linkerParentPath}/${attachmentsFolder}`;
+
+				// Skip if the attachment is already in the right place
+				const targetPath = `${targetFolderPath}/${attachment.name}`;
+				if (attachment.path === targetPath) {
+					continue;
+				}
+
+				// Create the target folder if it doesn't exist
+				const folderExists =
+					await vault.adapter.exists(targetFolderPath);
+				if (!folderExists) {
+					await vault.createFolder(targetFolderPath);
+				}
+
+				// Move the attachment
+				await fileManager.renameFile(attachment, targetPath);
+				movedCount++;
+			}
+
+			return movedCount;
+		}).mapError((error) => {
+			return new MoveAttachmentsError(
+				`Failed to move attachments: ${error.message}`,
+				error,
+			);
+		});
+	}
 }
 
 // Error class for file moving operations
 class MoveFilesError extends Error {
-  readonly type = "move-files-error";
-  cause?: unknown;
+	readonly type = "move-files-error";
+	cause?: unknown;
 
-  constructor(message: string, cause?: unknown) {
-    super(message);
-    this.name = "MoveFilesError";
-    this.cause = cause;
-  }
+	constructor(message: string, cause?: unknown) {
+		super(message);
+		this.name = "MoveFilesError";
+		this.cause = cause;
+	}
 }
