@@ -1,129 +1,149 @@
-import { App, Notice, TFile } from "obsidian";
-import SGDB from "steamgriddb";
+import { App, Notice, requestUrl } from "obsidian";
 import type OrbnamentsPlugin from "../main";
 
-export function videogameEntries(app: App): TFile[] {
-	const metadataCache = app.metadataCache;
+interface SteamGridDBGame {
+	id: number;
+	name: string;
+}
 
-	// Find the videogame-entry file
-	const videogameEntryFile = metadataCache.getFirstLinkpathDest("videogame-entry", "");
-	if (!videogameEntryFile) {
+interface SteamGridDBGrid {
+	id: number;
+	url: string;
+}
+
+async function searchGame(
+	apiKey: string,
+	gameName: string,
+): Promise<SteamGridDBGame[]> {
+	try {
+		const response = await requestUrl({
+			url: `https://www.steamgriddb.com/api/v2/search/autocomplete/${encodeURIComponent(gameName)}`,
+			headers: {
+				Authorization: `Bearer ${apiKey}`,
+			},
+		});
+
+		const data = JSON.parse(response.text);
+		return data.data || [];
+	} catch (error) {
+		console.error(`Error searching for game: ${gameName}`, error);
 		return [];
 	}
+}
 
-	// Get all files that link to videogame-entry (backlinks)
-	const resolvedLinks = metadataCache.resolvedLinks;
-	const videogameFiles: TFile[] = [];
+async function getGrids(
+	apiKey: string,
+	gameId: number,
+): Promise<SteamGridDBGrid[]> {
+	try {
+		const response = await requestUrl({
+			url: `https://www.steamgriddb.com/api/v2/grids/game/${gameId}`,
+			headers: {
+				Authorization: `Bearer ${apiKey}`,
+			},
+		});
 
-	for (const [sourcePath, links] of Object.entries(resolvedLinks)) {
-		if (links[videogameEntryFile.path]) {
-			const file = app.vault.getFileByPath(sourcePath);
-			if (file instanceof TFile) {
-				videogameFiles.push(file);
-			}
-		}
+		const data = JSON.parse(response.text);
+		return data.data || [];
+	} catch (error) {
+		console.error(`Error getting grids for game ${gameId}:`, error);
+		return [];
 	}
-
-	return videogameFiles;
 }
 
-export function videogameEntriesMissingCover(app: App, entries: TFile[]): TFile[] {
-	return entries.filter((file) => {
-		const cache = app.metadataCache.getFileCache(file);
-		const frontmatter = cache?.frontmatter;
-		if (!frontmatter) return false;
-		
-		const cover = frontmatter.cover;
-		return !cover || cover.startsWith("http");
+async function downloadImage(url: string): Promise<ArrayBuffer> {
+	const response = await requestUrl({
+		url: url,
 	});
+	return response.arrayBuffer;
 }
 
-export async function pullCoverFromSteamGridDB(
+export async function downloadVideogameCovers(
+	plugin: OrbnamentsPlugin,
 	app: App,
-	client: SGDB,
-	gameName: string,
-	destPath: string = "Videojuegos/img"
-): Promise<string | null> {
-	const games = await client.searchGame(gameName);
-	if (!games || games.length === 0 || !games[0]) return null;
-
-	const gameId = games[0].id;
-	const grids = await client.getGrids({ type: "game", id: gameId });
-
-	if (!grids || grids.length === 0 || !grids[0]) return null;
-
-	const coverUrl = grids[0].url;
-	const coverExt = coverUrl.toString().split(".").pop() || "png";
-	const targetExt = coverExt === "webp" ? "webp" : coverExt;
-	const coverFilename = `${gameName} — cover.${targetExt}`;
-
-	// Ensure the destination path exists
-	const folderExists = await app.vault.adapter.exists(destPath);
-	if (!folderExists) {
-		await app.vault.createFolder(destPath);
-	}
-
-	const coverPath = `${destPath}/${coverFilename}`;
-	const existingFile = app.vault.getAbstractFileByPath(coverPath);
-
-	if (!existingFile) {
-		const response = await fetch(coverUrl);
-		const arrayBuffer = await response.arrayBuffer();
-		await app.vault.createBinary(coverPath, arrayBuffer);
-	}
-
-	return coverFilename;
-}
-
-export async function setCover(app: App, file: TFile, coverFilename: string) {
-	await app.fileManager.processFrontMatter(file, (fm) => {
-		fm.cover = `[[${coverFilename}]]`;
-	});
-}
-
-export async function downloadVideogameCovers(plugin: OrbnamentsPlugin, app: App) {
-	const secretName = plugin.settings.steamGridDbSecretName;
-	
-	let apiKey = secretName;
-	
-	// if secret storage exists use it
-	if (secretName && (app as any).secretStorage) {
-		apiKey = await (app as any).secretStorage.getSecret(secretName) || secretName;
-	}
-
+) {
+	const apiKey = plugin.settings.steamGridDbApiKey;
 	if (!apiKey) {
-		new Notice("SteamGridDB API Key is not configured in settings.");
+		new Notice("SteamGridDB API Key is not set in settings.");
 		return;
 	}
 
-	const client = new SGDB(apiKey);
-	const allEntries = videogameEntries(app);
-	
-	if (allEntries.length === 0) {
-		new Notice("No videogame entries found.");
-		return;
-	}
-	
-	const missingCoverEntries = videogameEntriesMissingCover(app, allEntries);
-
+	const files = app.vault.getMarkdownFiles();
 	let successCount = 0;
 	let failCount = 0;
-	const skipCount = allEntries.length - missingCoverEntries.length;
+	let skipCount = 0;
 
-	for (const file of missingCoverEntries) {
+	for (const file of files) {
+		const cache = app.metadataCache.getFileCache(file);
+		const frontmatter = cache?.frontmatter;
+
+		if (!frontmatter) continue;
+
+		// Check if it's a videogame entry
+		const isVideogame =
+			frontmatter.categories?.includes("[[videogame-entry]]") ||
+			frontmatter.categories?.includes("videogame-entry");
+		if (!isVideogame) continue;
+
+		// Check if it already has a local cover
+		const cover = frontmatter.cover;
+		if (cover && !cover.startsWith("http")) {
+			skipCount++;
+			continue; // Skip if it already has a local cover
+		}
+
+		// Process this file
 		const gameName = file.basename.replace(/\s*\+.*$/, "").trim(); // Basic clean up
 		new Notice(`Searching cover for ${gameName}...`);
 
 		try {
-			const coverFilename = await pullCoverFromSteamGridDB(app, client, gameName);
-			
-			if (coverFilename) {
-				await setCover(app, file, coverFilename);
-				successCount++;
-				new Notice(`Successfully added cover for ${gameName}`);
+			const games = await searchGame(apiKey, gameName);
+			if (games && games.length > 0 && games[0]) {
+				const gameId = games[0].id;
+				const grids = await getGrids(apiKey, gameId);
+
+				if (grids && grids.length > 0 && grids[0]) {
+					const coverUrl = grids[0].url;
+					const coverExt =
+						coverUrl.toString().split(".").pop() || "png";
+					const targetExt =
+						coverExt === "webp" ? "webp" : coverExt;
+					const coverFilename = `${gameName} — cover.${targetExt}`;
+
+					// Fetch the image
+					const arrayBuffer = await downloadImage(coverUrl);
+
+					// Save the image to Videojuegos/img/
+					const imgFolderPath = "Videojuegos/img";
+					const coverPath = `${imgFolderPath}/${coverFilename}`;
+
+					// Ensure the img folder exists
+					const imgFolder =
+						app.vault.getFolderByPath(imgFolderPath);
+					if (!imgFolder) {
+						await app.vault.createFolder(imgFolderPath);
+					}
+
+					const existingFile =
+						app.vault.getAbstractFileByPath(coverPath);
+					if (!existingFile) {
+						await app.vault.createBinary(coverPath, arrayBuffer);
+					}
+
+					// Update frontmatter
+					await app.fileManager.processFrontMatter(file, (fm) => {
+						fm.cover = `[[${coverFilename}]]`;
+					});
+
+					successCount++;
+					new Notice(`Successfully added cover for ${gameName}`);
+				} else {
+					failCount++;
+					new Notice(`No covers found for ${gameName}`);
+				}
 			} else {
 				failCount++;
-				new Notice(`No covers found for ${gameName}`);
+				new Notice(`Game not found on SteamGridDB: ${gameName}`);
 			}
 		} catch (error) {
 			console.error(`Error processing ${gameName}:`, error);
@@ -133,6 +153,6 @@ export async function downloadVideogameCovers(plugin: OrbnamentsPlugin, app: App
 	}
 
 	new Notice(
-		`Cover download complete: ${successCount} added, ${skipCount} skipped, ${failCount} failed.`
+		`Cover download complete: ${successCount} added, ${skipCount} skipped, ${failCount} failed.`,
 	);
 }

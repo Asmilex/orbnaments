@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, SecretComponent, Setting } from "obsidian";
+import { App, PluginSettingTab, Setting } from "obsidian";
 import type OrbnamentsPlugin from "../main";
 
 export class OrbnamentsSettingTab extends PluginSettingTab {
@@ -16,15 +16,15 @@ export class OrbnamentsSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("SteamGridDB API Key")
-			.setDesc("Select a secret from SecretStorage containing your SteamGridDB API key.")
-			.addComponent(
-				(el) =>
-					new SecretComponent(this.app, el)
-						.setValue(this.plugin.settings.steamGridDbSecretName)
-						.onChange(async (value) => {
-							this.plugin.settings.steamGridDbSecretName = value;
-							await this.plugin.saveSettings();
-						}),
+			.setDesc("API key for downloading videogame covers.")
+			.addText((text) =>
+				text
+					.setPlaceholder("Enter your API key")
+					.setValue(this.plugin.settings.steamGridDbApiKey)
+					.onChange(async (value) => {
+						this.plugin.settings.steamGridDbApiKey = value;
+						await this.plugin.saveSettings();
+					}),
 			);
 	}
 }
