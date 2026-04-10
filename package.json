@@ -25,6 +25,7 @@
 	},
 	"dependencies": {
 		"obsidian": "latest",
+		"steamgriddb": "2.2.1",
 		"typescript-result": "^3.5.2"
 	}
 }
