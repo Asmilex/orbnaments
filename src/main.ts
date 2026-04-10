@@ -1,5 +1,8 @@
 import { Notice, Plugin, TFile } from "obsidian";
 import { Result } from "typescript-result";
+import { OrbnamentsSettingTab } from "./ui/settings-tab";
+import { DEFAULT_SETTINGS, OrbnamentsSettings } from "./settings";
+import { downloadVideogameCovers } from "./commands/download-covers";
 
 // Error classes for different failure scenarios
 class SyncConflictError extends Error {
@@ -25,8 +28,22 @@ class MoveAttachmentsError extends Error {
 }
 
 export default class OrbnamentsPlugin extends Plugin {
+	settings!: OrbnamentsSettings;
+
 	async onload() {
 		console.debug("Orbnaments loading...");
+
+		await this.loadSettings();
+
+		this.addSettingTab(new OrbnamentsSettingTab(this.app, this));
+
+		this.addCommand({
+			id: "download-videogame-covers",
+			name: "Download missing videogame covers",
+			callback: async () => {
+				await downloadVideogameCovers(this, this.app);
+			},
+		});
 
 		this.addCommand({
 			id: "remove-syncthing-conflict",
@@ -103,6 +120,18 @@ export default class OrbnamentsPlugin extends Plugin {
 
 	onunload() {
 		console.debug("Orbnaments unloading");
+	}
+
+	async loadSettings() {
+		this.settings = Object.assign(
+			{},
+			DEFAULT_SETTINGS,
+			await this.loadData(),
+		);
+	}
+
+	async saveSettings() {
+		await this.saveData(this.settings);
 	}
 
 	/**
