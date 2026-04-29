@@ -4,6 +4,7 @@ import { OrbnamentsSettingTab } from "./ui/settings-tab";
 import { DEFAULT_SETTINGS, OrbnamentsSettings } from "./settings";
 import { downloadVideogameCovers } from "./commands/download-covers";
 import { createQuoteNote } from "./commands/create-quote-note";
+import { createThoughtsNote } from "./commands/create-thoughts-note";
 
 // Error classes for different failure scenarios
 class SyncConflictError extends Error {
@@ -51,6 +52,14 @@ export default class OrbnamentsPlugin extends Plugin {
 			name: "Create new quote note",
 			callback: async () => {
 				await createQuoteNote(this.app);
+			},
+		});
+
+		this.addCommand({
+			id: "create-thoughts-note",
+			name: "Thoughts on this note",
+			callback: async () => {
+				await createThoughtsNote(this.app);
 			},
 		});
 
