@@ -48,7 +48,7 @@ export async function openRandomQuote(app: App): Promise<void> {
 	}
 
 	try {
-		await app.workspace.getLeaf(true).openFile(randomQuote);
+		await app.workspace.getLeaf(false).openFile(randomQuote);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		new Notice(`Could not open the random quote: ${message}`);
