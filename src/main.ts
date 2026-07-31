@@ -6,6 +6,7 @@ import { downloadVideogameCovers } from "./commands/download-covers";
 import { createQuoteNote } from "./commands/create-quote-note";
 import { createThoughtsNote } from "./commands/create-thoughts-note";
 import { createExpenseNote } from "./commands/create-expense-note";
+import { openRandomQuote } from "./commands/open-random-quote";
 
 // Error classes for different failure scenarios
 class SyncConflictError extends Error {
@@ -53,6 +54,14 @@ export default class OrbnamentsPlugin extends Plugin {
 			name: "Create new quote note",
 			callback: async () => {
 				await createQuoteNote(this.app);
+			},
+		});
+
+		this.addCommand({
+			id: "open-random-quote",
+			name: "Random quote",
+			callback: async () => {
+				await openRandomQuote(this.app);
 			},
 		});
 
