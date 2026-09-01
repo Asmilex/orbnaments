@@ -1,4 +1,4 @@
-import { Notice, Plugin, TFile } from "obsidian";
+import { Editor, Notice, Plugin, TFile } from "obsidian";
 import { Result } from "typescript-result";
 import { OrbnamentsSettingTab } from "./ui/settings-tab";
 import { DEFAULT_SETTINGS, OrbnamentsSettings } from "./settings";
@@ -7,6 +7,7 @@ import { createQuoteNote } from "./commands/create-quote-note";
 import { createThoughtsNote } from "./commands/create-thoughts-note";
 import { createExpenseNote } from "./commands/create-expense-note";
 import { openRandomQuote } from "./commands/open-random-quote";
+import { moveSelectionToFootnote } from "./commands/move-selection-to-footnote";
 
 // Error classes for different failure scenarios
 class SyncConflictError extends Error {
@@ -78,6 +79,14 @@ export default class OrbnamentsPlugin extends Plugin {
 			name: "New expense",
 			callback: async () => {
 				await createExpenseNote(this.app);
+			},
+		});
+
+		this.addCommand({
+			id: "move-selection-to-footnote",
+			name: "Move selection to a new footnote",
+			editorCallback: (editor: Editor) => {
+				moveSelectionToFootnote(this.app, editor);
 			},
 		});
 
