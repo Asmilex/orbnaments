@@ -8,6 +8,7 @@ import { createThoughtsNote } from "./commands/create-thoughts-note";
 import { createExpenseNote } from "./commands/create-expense-note";
 import { openRandomQuote } from "./commands/open-random-quote";
 import { moveSelectionToFootnote } from "./commands/move-selection-to-footnote";
+import { insertTodaysHeading } from "./commands/insert-todays-heading";
 
 // Error classes for different failure scenarios
 class SyncConflictError extends Error {
@@ -87,6 +88,14 @@ export default class OrbnamentsPlugin extends Plugin {
 			name: "Move selection to a new footnote",
 			editorCallback: (editor: Editor) => {
 				moveSelectionToFootnote(this.app, editor);
+			},
+		});
+
+		this.addCommand({
+			id: "insert-todays-heading",
+			name: "Today's heading",
+			editorCallback: (editor: Editor) => {
+				insertTodaysHeading(editor);
 			},
 		});
 
