@@ -94,7 +94,7 @@ export default class OrbnamentsPlugin extends Plugin {
 
 		this.addCommand({
 			id: "rename-footnote",
-			name: "Rename the footnote under the cursor",
+			name: "Rename footnote",
 			editorCallback: (editor: Editor) => {
 				renameFootnote(this.app, editor);
 			},

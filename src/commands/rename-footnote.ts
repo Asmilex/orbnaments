@@ -55,7 +55,7 @@ export function renameFootnote(app: App, editor: Editor): void {
 	const oldLabel = findLabelAtCursor(editor);
 
 	if (!oldLabel) {
-		new Notice("Place the cursor on a footnote first");
+		new Notice("No footnote under cursor.");
 		return;
 	}
 
