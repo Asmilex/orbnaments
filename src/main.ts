@@ -10,6 +10,8 @@ import { openRandomQuote } from "./commands/open-random-quote";
 import { moveSelectionToFootnote } from "./commands/move-selection-to-footnote";
 import { renameFootnote } from "./commands/rename-footnote";
 import { insertTodaysHeading } from "./commands/insert-todays-heading";
+import { renderToPdf } from "./commands/render-pdf";
+import { copyAsShareableMarkdown } from "./commands/copy-shareable-markdown";
 
 // Error classes for different failure scenarios
 class SyncConflictError extends Error {
@@ -109,9 +111,27 @@ export default class OrbnamentsPlugin extends Plugin {
 		});
 
 		this.addCommand({
+			id: "render-to-pdf",
+			// ilm-prima is the name of the Typst template.
+
+			name: "Render to PDF using ilm-prima",
+			callback: () => {
+				renderToPdf(this);
+			},
+		});
+
+		this.addCommand({
+			id: "copy-as-shareable-markdown",
+			name: "Copy as shareable markdown",
+			callback: async () => {
+				await copyAsShareableMarkdown(this.app);
+			},
+		});
+
+		this.addCommand({
 			id: "remove-syncthing-conflict",
 			// Syncthing is a proper name.
-			// eslint-disable-next-line obsidianmd/ui/sentence-case
+
 			name: "Clear Syncthing's conflicts",
 			callback: async () => {
 				const result = await this.removeSyncConflicts();

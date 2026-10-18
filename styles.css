@@ -6,3 +6,16 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+
+/* The "Render to PDF" dialog: give the free-text fields room to breathe. */
+.orbnaments-render-pdf .setting-item-control input[type="text"] {
+	width: 100%;
+	min-width: 16em;
+}
+
+.orbnaments-render-pdf .setting-item-control textarea {
+	width: 100%;
+	min-width: 16em;
+	min-height: 7em;
+	resize: vertical;
+}
