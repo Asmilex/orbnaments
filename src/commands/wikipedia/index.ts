@@ -144,6 +144,9 @@ export async function fillFromWikipedia(plugin: OrbnamentsPlugin): Promise<void>
 			return;
 		}
 
+		const placement = placeFor(plugin, file, fileNameFor(page.title));
+		const basename = placement.renamed ? fileNameFor(page.title) : file.basename;
+
 		await app.fileManager.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
 			const merge = (key: string, values: string[]) => {
 				const current = asStrings(frontmatter[key]);
@@ -160,10 +163,13 @@ export async function fillFromWikipedia(plugin: OrbnamentsPlugin): Promise<void>
 			merge("source", ["[[Wikipedia]]"]);
 			frontmatter.created ??= moment().format("YYYY-MM-DD");
 			frontmatter.link = page.url;
+			// The old name was a guess at the article, so it goes; the
+			// translation stays, and so does the exact title if the file
+			// name had to drop characters from it.
 			merge(
 				"aliases",
 				[page.title, page.translation ?? ""].filter(
-					(alias) => alias && normalizeTitle(alias) !== normalizeTitle(file.basename),
+					(alias) => alias && normalizeTitle(alias) !== normalizeTitle(basename),
 				),
 			);
 
@@ -174,10 +180,25 @@ export async function fillFromWikipedia(plugin: OrbnamentsPlugin): Promise<void>
 
 		// Renaming may stop to ask about updating links.
 		progress.hide();
-		await moveToFolder(plugin, file).catch((error) => {
-			console.error("Moving the filled note failed", error);
-			new Notice(`Filled, but couldn't move it to ${settings.wikipediaFolder}`);
-		});
+
+		if (placement.path !== file.path) {
+			const folder = placement.path.includes("/")
+				? placement.path.slice(0, placement.path.lastIndexOf("/"))
+				: "";
+
+			if (folder && !app.vault.getFolderByPath(folder)) {
+				await app.vault.createFolder(folder);
+			}
+
+			await app.fileManager.renameFile(file, placement.path).catch((error) => {
+				console.error("Moving the filled note failed", error);
+				new Notice(`Filled, but couldn't move it to ${placement.path}`);
+			});
+		}
+
+		if (!placement.renamed) {
+			new Notice(`"${fileNameFor(page.title)}" already exists, so the note kept its name`);
+		}
 
 		new Notice(
 			`Filled from "${page.title}", ${describe(stats)}` +
@@ -191,26 +212,48 @@ export async function fillFromWikipedia(plugin: OrbnamentsPlugin): Promise<void>
 	}
 }
 
-async function moveToFolder(plugin: OrbnamentsPlugin, file: TFile): Promise<void> {
-	const folder = normalizePath(plugin.settings.wikipediaFolder.trim());
-	const { vault, fileManager } = plugin.app;
+/**
+ * Wikipedia's title as a file name: `Style: Lessons in Clarity and Grace`
+ * becomes `Style — Lessons in Clarity and Grace`, and characters that files or
+ * wikilinks can't hold go.
+ */
+function fileNameFor(title: string): string {
+	return title
+		.replace(/\s*:\s*/g, " — ")
+		.replace(/\//g, "-")
+		.replace(/[\\*"<>|#^[\]?]/g, "")
+		.replace(/\s+/g, " ")
+		.replace(/[\s.]+$/, "")
+		.trim();
+}
 
-	if (!plugin.settings.wikipediaFolder.trim() || file.parent?.path === folder) {
-		return;
+/**
+ * Where the filled note should end up: in the configured folder (or where it
+ * is, if there's none), named after the article. Keeps the current name when
+ * another note already has that one.
+ */
+function placeFor(
+	plugin: OrbnamentsPlugin,
+	file: TFile,
+	name: string,
+): { path: string; renamed: boolean } {
+	const configured = plugin.settings.wikipediaFolder.trim();
+	const folder = configured ? normalizePath(configured) : (file.parent?.path ?? "/");
+	const pathIn = (base: string) =>
+		normalizePath(folder === "/" || folder === "" ? base : `${folder}/${base}`);
+	const wanted = pathIn(`${name}.md`);
+	const taken = plugin.app.vault.getAbstractFileByPath(wanted);
+
+	if (name.length > 0 && (!taken || taken === file)) {
+		return { path: wanted, renamed: true };
 	}
 
-	const destination = normalizePath(`${folder}/${file.name}`);
+	const fallback = pathIn(file.name);
 
-	if (vault.getAbstractFileByPath(destination)) {
-		new Notice(`${destination} already exists; left the note where it was`);
-		return;
-	}
-
-	if (!vault.getFolderByPath(folder)) {
-		await vault.createFolder(folder);
-	}
-
-	await fileManager.renameFile(file, destination);
+	return {
+		path: plugin.app.vault.getAbstractFileByPath(fallback) && fallback !== file.path ? file.path : fallback,
+		renamed: false,
+	};
 }
 
 /**
