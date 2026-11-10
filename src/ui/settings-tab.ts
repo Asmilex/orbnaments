@@ -81,5 +81,63 @@ export class OrbnamentsSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					}),
 			);
+
+		new Setting(containerEl).setName("Wikipedia").setHeading();
+
+		new Setting(containerEl)
+			.setName("Language")
+			.setDesc("Language code of the wiki the articles come from.")
+			.addText((text) =>
+				text
+					// Language codes are lowercase.
+					// eslint-disable-next-line obsidianmd/ui/sentence-case
+					.setPlaceholder("en")
+					.setValue(this.plugin.settings.wikipediaLanguage)
+					.onChange(async (value) => {
+						this.plugin.settings.wikipediaLanguage = value.trim() || "en";
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Alias language")
+			.setDesc("The article's title in this language becomes an alias, and note titles written in it are translated before looking them up. Leave empty to skip.")
+			.addText((text) =>
+				text
+					// Language codes are lowercase.
+					// eslint-disable-next-line obsidianmd/ui/sentence-case
+					.setPlaceholder("es")
+					.setValue(this.plugin.settings.wikipediaAliasLanguage)
+					.onChange(async (value) => {
+						this.plugin.settings.wikipediaAliasLanguage = value.trim();
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Folder")
+			.setDesc("Filled notes move here. Leave empty to keep them where they are.")
+			.addText((text) =>
+				text
+					.setPlaceholder("Clippings")
+					.setValue(this.plugin.settings.wikipediaFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.wikipediaFolder = value.trim();
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Categories folder")
+			.setDesc("Filled notes get filed under the categories their first paragraphs link to. Categories are the notes in this folder, plus any filed under [[categories]].")
+			.addText((text) =>
+				text
+					.setPlaceholder("Categorías")
+					.setValue(this.plugin.settings.wikipediaCategoryFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.wikipediaCategoryFolder = value.trim();
+						await this.plugin.saveSettings();
+					}),
+			);
 	}
 }

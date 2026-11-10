@@ -36,6 +36,7 @@ export default tseslint.config(
 						"SteamGridDB",
 						"Syncthing",
 						"Typst",
+						"Wikipedia",
 					],
 					acronyms: ["API", "PATH", "PDF", "PDFs", "URL"],
 					ignoreRegex: [

@@ -12,6 +12,7 @@ import { renameFootnote } from "./commands/rename-footnote";
 import { insertTodaysHeading } from "./commands/insert-todays-heading";
 import { renderToPdf } from "./commands/render-pdf";
 import { copyAsShareableMarkdown } from "./commands/copy-shareable-markdown";
+import { fillFromWikipedia, relinkWikipediaClippings } from "./commands/wikipedia";
 
 // Error classes for different failure scenarios
 class SyncConflictError extends Error {
@@ -125,6 +126,22 @@ export default class OrbnamentsPlugin extends Plugin {
 			name: "Copy as shareable markdown",
 			callback: async () => {
 				await copyAsShareableMarkdown(this.app);
+			},
+		});
+
+		this.addCommand({
+			id: "fill-from-wikipedia",
+			name: "Fill note from Wikipedia",
+			callback: async () => {
+				await fillFromWikipedia(this);
+			},
+		});
+
+		this.addCommand({
+			id: "relink-wikipedia-clippings",
+			name: "Point Wikipedia clippings at my notes",
+			callback: async () => {
+				await relinkWikipediaClippings(this);
 			},
 		});
 
