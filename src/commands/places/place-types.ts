@@ -240,7 +240,7 @@ export class PlaceTypes {
 	}
 }
 
-const TOWN_LEVELS = ["village", "town", "city"];
+const TOWN_LEVELS = ["village", "town", "city", "municipality"];
 
 /** Notes of places, by name and alias, to point `localizacion` at. */
 export class PlaceNotes {
@@ -274,30 +274,44 @@ export class PlaceNotes {
 	/**
 	 * The most specific part of an address that has a note of the right kind:
 	 * the city of Granada for `city: Granada`, never for `province: Granada`.
-	 * A town without a note still counts, as a link to a note yet to exist,
-	 * rather than climbing to its region.
+	 * Levels at or below the note's own kind are skipped, so a city lands in
+	 * its region and never in itself. A town without a note still counts, as
+	 * a link to a note yet to exist, rather than climbing to its region.
 	 */
 	containerFor(
 		address: { level: string; name: string }[],
 		self: TFile,
 	): { file: TFile | null; name: string } | null {
-		for (const { level, name } of address) {
-			const expected = this.types.classify({ place: level });
-			const note = this.find(name);
-			const type = note ? this.types.typeOf(note) : null;
+		const own = this.types.typeOf(self);
 
-			if (
-				note &&
-				note !== self &&
-				expected &&
-				type &&
-				(this.types.isA(type, expected) || this.types.isA(expected, type))
-			) {
-				return { file: note, name };
+		for (const { level, name } of address) {
+			const expected = this.types.classify({ place: level === "municipality" ? "city" : level });
+
+			// The note is this kind of place itself: Almería for `city: Almería`.
+			if (own && expected && this.types.isA(own, expected)) {
+				continue;
+			}
+
+			// Bilingual names, `Arrasate / Mondragón`, match by any of their parts.
+			const parts = [name, ...name.split("/").map((part) => part.trim())];
+
+			for (const part of parts) {
+				const note = this.find(part);
+				const type = note ? this.types.typeOf(note) : null;
+
+				if (
+					note &&
+					note !== self &&
+					expected &&
+					type &&
+					(this.types.isA(type, expected) || this.types.isA(expected, type))
+				) {
+					return { file: note, name: part };
+				}
 			}
 
 			if (TOWN_LEVELS.includes(level)) {
-				return { file: null, name };
+				return { file: null, name: parts[1] ?? name };
 			}
 		}
 

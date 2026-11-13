@@ -89,6 +89,41 @@ function searchContext(app: App, file: TFile, types: PlaceTypes, notes: PlaceNot
 	return { text, near: own ?? aroundWithCoordinates ?? null, own, wanted };
 }
 
+/** Words too common to say two names are about the same thing. */
+const FILLER = new Set(["de", "del", "la", "las", "el", "los", "the", "and", "y", "of", "en"]);
+
+function words(name: string): string[] {
+	return categoryKey(name)
+		.split(" ")
+		.filter((word) => word.length > 1 && !FILLER.has(word));
+}
+
+/**
+ * Whether OSM's name for the match can become an alias of the note: it has to
+ * share a word with the note's name, and no other note may already go by it,
+ * or links meant for that one would land here. Picking the Monasterio de
+ * Piedra for a note about its park mustn't take over [[Monasterio de Piedra]].
+ */
+function fitsAsAlias(app: App, name: string, file: TFile): boolean {
+	const own = new Set(words(file.basename));
+
+	if (!words(name).some((word) => own.has(word))) {
+		return false;
+	}
+
+	const key = categoryKey(name);
+
+	return !app.vault.getMarkdownFiles().some((other) => {
+		if (other === file) {
+			return false;
+		}
+
+		const aliases = asStrings(app.metadataCache.getFileCache(other)?.frontmatter?.aliases);
+
+		return [other.basename, ...aliases].some((known) => categoryKey(known) === key);
+	});
+}
+
 function link(app: App, file: TFile, from: TFile): string {
 	return `[[${app.metadataCache.fileToLinktext(file, from.path, true)}]]`;
 }
@@ -195,7 +230,7 @@ async function merge(
 			const name = details.name.trim();
 			const known = [file.basename, splitQualifier(file.basename).base, ...aliases].map(categoryKey);
 
-			if (name && !known.includes(categoryKey(name))) {
+			if (name && !known.includes(categoryKey(name)) && fitsAsAlias(app, name, file)) {
 				frontmatter.aliases = [...aliases, name];
 			}
 		}
