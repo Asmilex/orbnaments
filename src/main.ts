@@ -13,6 +13,7 @@ import { insertTodaysHeading } from "./commands/insert-todays-heading";
 import { renderToPdf } from "./commands/render-pdf";
 import { copyAsShareableMarkdown } from "./commands/copy-shareable-markdown";
 import { fillFromWikipedia, relinkWikipediaClippings } from "./commands/wikipedia";
+import { fillFromMap } from "./commands/places";
 
 // Error classes for different failure scenarios
 class SyncConflictError extends Error {
@@ -134,6 +135,14 @@ export default class OrbnamentsPlugin extends Plugin {
 			name: "Fill note from Wikipedia",
 			callback: async () => {
 				await fillFromWikipedia(this);
+			},
+		});
+
+		this.addCommand({
+			id: "look-up-on-maps",
+			name: "Look up on maps",
+			callback: async () => {
+				await fillFromMap(this);
 			},
 		});
 

@@ -139,5 +139,68 @@ export class OrbnamentsSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					}),
 			);
+
+		new Setting(containerEl).setName("Places").setHeading();
+
+		containerEl.createEl("p", {
+			cls: "setting-item-description",
+			text: "Filling a note from the map sends its name to these OpenStreetMap services, which are public by default. Both can be self-hosted. Place types are the categories under the places category; the categories folder above applies here too.",
+		});
+
+		const textSetting = (
+			name: string,
+			desc: string,
+			placeholder: string,
+			get: () => string,
+			set: (value: string) => void,
+		) =>
+			new Setting(containerEl)
+				.setName(name)
+				.setDesc(desc)
+				.addText((text) =>
+					text
+						.setPlaceholder(placeholder)
+						.setValue(get())
+						.onChange(async (value) => {
+							set(value.trim());
+							await this.plugin.saveSettings();
+						}),
+				);
+
+		textSetting(
+			"Search service",
+			"Photon, used to search as you type.",
+			"https://photon.komoot.io",
+			() => this.plugin.settings.placesSearchUrl,
+			(value) => (this.plugin.settings.placesSearchUrl = value || "https://photon.komoot.io"),
+		);
+		textSetting(
+			"Details service",
+			"Nominatim, used for a place's tags and address.",
+			"https://nominatim.openstreetmap.org",
+			() => this.plugin.settings.placesDetailsUrl,
+			(value) => (this.plugin.settings.placesDetailsUrl = value || "https://nominatim.openstreetmap.org"),
+		);
+		textSetting(
+			"Address language",
+			"Language for the names of towns, regions and countries.",
+			"es",
+			() => this.plugin.settings.placesLanguage,
+			(value) => (this.plugin.settings.placesLanguage = value),
+		);
+		textSetting(
+			"Places category",
+			"The category every place type is filed under, directly or not.",
+			"lugares",
+			() => this.plugin.settings.placesCategory,
+			(value) => (this.plugin.settings.placesCategory = value || "lugares"),
+		);
+		textSetting(
+			"Folder",
+			"Empty notes filled from the map move here. Leave empty to keep them where they are.",
+			"Lugares",
+			() => this.plugin.settings.placesFolder,
+			(value) => (this.plugin.settings.placesFolder = value),
+		);
 	}
 }

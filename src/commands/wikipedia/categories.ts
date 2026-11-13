@@ -1,22 +1,8 @@
 import { App, TFile } from "obsidian";
-import { asStrings, stripWikilink } from "../../utils/obsidian-markdown";
+import { asStrings } from "../../utils/obsidian-markdown";
+import { categoryKey, linkedNames } from "../../utils/categories";
 import { resolveTitles } from "./api";
 import { wikiTargetsIn } from "./links";
-
-/** `category-theory`, `Category theory` and `Category_theory` all read the same. */
-function categoryKey(name: string): string {
-	return name
-		.normalize("NFD")
-		.replace(/[̀-ͯ]/g, "")
-		.toLowerCase()
-		.replace(/[\s_-]+/g, " ")
-		.trim();
-}
-
-/** Linktext targets of a frontmatter list, `"[[mathematics]]"` -> `mathematics`. */
-function linkedNames(value: unknown): string[] {
-	return asStrings(value).map((entry) => stripWikilink(entry.replace(/\|.*\]\]$/, "]]")));
-}
 
 /** A category note, or a name used as a category before its note exists. */
 type Category = TFile | string;

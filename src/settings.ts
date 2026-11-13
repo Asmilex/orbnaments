@@ -27,6 +27,17 @@ export interface OrbnamentsSettings {
 	wikipediaFolder: string;
 	/** Notes here count as categories, besides those filed under `[[categories]]`. */
 	wikipediaCategoryFolder: string;
+
+	/** Photon, for searching OpenStreetMap. */
+	placesSearchUrl: string;
+	/** Nominatim, for a place's tags and address. */
+	placesDetailsUrl: string;
+	/** Language for names in addresses, `es`. */
+	placesLanguage: string;
+	/** The category every place type descends from. */
+	placesCategory: string;
+	/** Where new place notes move to. Empty leaves them where they are. */
+	placesFolder: string;
 }
 
 export const DEFAULT_SETTINGS: OrbnamentsSettings = {
@@ -51,4 +62,10 @@ export const DEFAULT_SETTINGS: OrbnamentsSettings = {
 	wikipediaAliasLanguage: "es",
 	wikipediaFolder: "Clippings",
 	wikipediaCategoryFolder: "Categorías",
+
+	placesSearchUrl: "https://photon.komoot.io",
+	placesDetailsUrl: "https://nominatim.openstreetmap.org",
+	placesLanguage: "es",
+	placesCategory: "lugares",
+	placesFolder: "Lugares",
 };

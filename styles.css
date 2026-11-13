@@ -19,3 +19,14 @@ If your plugin does not need CSS, delete this file.
 	min-height: 7em;
 	resize: vertical;
 }
+
+/* The place picker: room between each result's icon and its text. */
+.orbnaments-place-search .suggestion-item.mod-complex {
+	align-items: center;
+	gap: var(--size-4-3);
+}
+
+.orbnaments-place-search .suggestion-icon {
+	display: flex;
+	color: var(--text-muted);
+}
